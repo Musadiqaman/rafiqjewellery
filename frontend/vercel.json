@@ -7,7 +7,7 @@
   "rewrites": [
     {
   "source": "/api/:path*",
-  "destination": "https://rafiqjewellery-1kpj.vercel.app/api/:path*"
+  "destination": "https://152.67.2.80/rafiq-api/:path*"
 },
     { "source": "/((?!api/|assets/|fonts/|downloads/|.*\\.).*)", "destination": "/index.html" }
   ]
