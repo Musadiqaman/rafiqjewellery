@@ -1,0 +1,40 @@
+{
+  "name": "rafiq-backend",
+  "private": true,
+  "version": "2.2.1",
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "doctor": "node scripts/doctor.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:db": "node scripts/test-db.mjs",
+    "db:indexes": "node scripts/db-indexes.js",
+    "clean:uploads": "node scripts/clean-uploads.js",
+    "format": "prettier --write config controllers middlewares models routes services validators utils scripts tests app.js server.js api",
+    "repair": "node scripts/repair.js"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "13.3.3",
+    "bcryptjs": "3.0.3",
+    "cookie-parser": "1.4.7",
+    "express": "5.3.0",
+    "helmet": "8.3.0",
+    "mongoose": "8.24.8",
+    "multer": "2.5.0",
+    "sharp": "0.35.5",
+    "zod": "4.6.7"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "server.js",
+  "devDependencies": {
+    "mongodb-memory-server-core": "10.4.3",
+    "prettier": "3.6.2"
+  },
+  "allowScripts": {
+    "sharp@0.35.5": true
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --include=optional",
+  "buildCommand": "npm run db:indexes",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "{app.js,config/**,controllers/**,middlewares/**,models/**,routes/**,services/**,validators/**,utils/**}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ]
+}
