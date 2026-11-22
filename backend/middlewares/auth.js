@@ -23,6 +23,8 @@ export async function requireAuth(req, _res, next) {
       .lean();
 
     if (!user) throw new HttpError(401, 'Account unavailable. Please sign in again.');
+    if (!['admin', 'cashier'].includes(user.role))
+      throw new HttpError(403, 'This account role is no longer available. Ask an administrator to assign Admin or Cashier access.');
     req.user = user;
     req.auth = claims;
     next();

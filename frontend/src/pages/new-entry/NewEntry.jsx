@@ -31,6 +31,7 @@ export function NewEntry({ user, shop, connected, onOpen, onDirtyChange }) {
     [rate, setRate] = useState(String(shop.ratePaisa / 100)),
     [customer, setCustomer] = useState({ cnic: '', name: '', phone: '' }),
     [item, setItem] = useState(''),
+    [carat, setCarat] = useState(''),
     [signature, setSignature] = useState(''),
     [thumb, setThumb] = useState(null),
     [photos, setPhotos] = useState([]),
@@ -77,7 +78,7 @@ export function NewEntry({ user, shop, connected, onOpen, onDirtyChange }) {
   const isDirty =
     hasWeight ||
     Object.values(customer).some((value) => String(value).trim()) ||
-    Boolean(signature || thumb || photos.length || item) ||
+    Boolean(signature || thumb || photos.length || item || carat) ||
     rate !== String(shop.ratePaisa / 100);
 
   useEffect(() => {
@@ -142,6 +143,7 @@ export function NewEntry({ user, shop, connected, onOpen, onDirtyChange }) {
       weight: numeric,
       ratePaisa: Math.round(Number(rate) * 100),
       items: item ? [item] : [],
+      carat: carat === '' ? null : Number(carat),
       customer: { ...customer, cnic: cnicDigits(customer.cnic) },
       photoIds: [],
       signatureId: signature ? '0'.repeat(24) : null,
@@ -181,6 +183,7 @@ export function NewEntry({ user, shop, connected, onOpen, onDirtyChange }) {
       setWeight(initialWeight());
       setCustomer({ cnic: '', name: '', phone: '' });
       setItem('');
+      setCarat('');
       setRate(String(shop.ratePaisa / 100));
       setSignature('');
       setThumb(null);
@@ -309,6 +312,23 @@ export function NewEntry({ user, shop, connected, onOpen, onDirtyChange }) {
                   ]}
                 />
               </Field>
+              <Field label="Carat (optional)">
+                <input
+                  aria-label="Gold carat"
+                  type="number"
+                  inputMode="decimal"
+                  min="1"
+                  max="24"
+                  step="0.5"
+                  placeholder="e.g. 22"
+                  value={carat}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    setCarat(e.target.value);
+                    setSaved(null);
+                  }}
+                />
+              </Field>
             </div>
           </div>
           <div className="weight-block">
@@ -329,11 +349,13 @@ export function NewEntry({ user, shop, connected, onOpen, onDirtyChange }) {
                     step="any"
                     placeholder="0"
                     value={
-                      name === 'grams' && weight.mode === 'traditional'
-                        ? sums.grams
-                          ? sums.grams.toFixed(3)
-                          : ''
-                        : weight[name]
+                      weight.mode === 'grams' && name !== 'grams'
+                        ? ''
+                        : name === 'grams' && weight.mode === 'traditional'
+                          ? sums.grams
+                            ? sums.grams.toFixed(3)
+                            : ''
+                          : weight[name]
                     }
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => unit(name, e.target.value)}

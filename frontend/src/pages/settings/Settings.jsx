@@ -23,7 +23,7 @@ function readScannerToken() {
 export function Settings({ user, shop }) {
   const client = useQueryClient(),
     admin = can(user.role, 'settings'),
-    [tab, setTab] = useState(admin ? 'shop' : 'security'),
+    [tab, setTab] = useState(admin ? 'shop' : 'activity'),
     [form, setForm] = useState({
       ...shop,
       affidavitTemplate: shop.affidavitTemplate || DEFAULT_AFFIDAVIT,
@@ -47,7 +47,7 @@ export function Settings({ user, shop }) {
   const audit = useQuery({
     queryKey: ['audit'],
     queryFn: () => api('/audit'),
-    enabled: admin && tab === 'activity' && !REVIEW_ONLY,
+    enabled: can(user.role, 'activity') && tab === 'activity' && !REVIEW_ONLY,
   });
   async function run(action, success) {
     setBusy(true);
@@ -105,7 +105,9 @@ export function Settings({ user, shop }) {
         ['security', 'Security', Shield],
         ['activity', 'Activity', FileText],
       ]
-    : [['security', 'Security', Shield]];
+    : user.role === 'cashier'
+      ? [['activity', 'My activity', FileText]]
+      : [];
   return (
     <div className="settings-page">
       <div className="settings-tabs">
@@ -240,7 +242,8 @@ export function Settings({ user, shop }) {
               <SelectControl
                 ariaLabel={'Role for ' + u.name}
                 disabled={busy || u._id === user.id || u.isPrimaryAdmin}
-                value={u.role}
+                value={roles.includes(u.role) ? u.role : ''}
+                placeholder={roles.includes(u.role) ? 'Select role' : `Legacy: ${u.role}`}
                 options={roles}
                 onChange={(role) =>
                   run(async () => {
@@ -254,7 +257,7 @@ export function Settings({ user, shop }) {
                 disabled={busy || u._id === user.id || u.isPrimaryAdmin}
                 onClick={() =>
                   run(async () => {
-                    await patch('/users/' + u._id, { role: u.role, active: !u.active });
+                    await patch('/users/' + u._id, { role: roles.includes(u.role) ? u.role : 'cashier', active: !u.active });
                     client.invalidateQueries({ queryKey: ['users'] });
                   }, 'Access updated')
                 }
@@ -270,16 +273,10 @@ export function Settings({ user, shop }) {
           )}
           <div className="role-summary">
             <span>
-              <b>Admin</b> Full access
+              <b>Admin</b> Full access, shop settings and team management
             </span>
             <span>
-              <b>Manager</b> Purchases, rate, export, void
-            </span>
-            <span>
-              <b>Cashier</b> View and create
-            </span>
-            <span>
-              <b>Viewer</b> Read only
+              <b>Cashier</b> Create entries, print receipts and view own activity only
             </span>
           </div>
         </section>
@@ -324,7 +321,7 @@ export function Settings({ user, shop }) {
       )}
       {tab === 'activity' && (
         <section className="card settings-card">
-          <h2>Recent activity</h2>
+          <h2>{admin ? 'Recent activity' : 'My activity'}</h2>
           {audit.data?.items.map((a) => (
             <div className="audit-row" key={a._id}>
               <strong>{a.action}</strong>

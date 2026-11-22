@@ -69,18 +69,28 @@ test(
       assert.equal((await request('/auth/setup', 'POST', admin)).status, 409);
       const forgedToken = token.slice(0, -1) + (token.endsWith('a') ? 'b' : 'a');
       assert.equal((await request('/records', 'GET', undefined, forgedToken)).status, 401);
-      for (const role of ['cashier', 'viewer'])
-        assert.equal(
-          (
-            await request('/users', 'POST', {
-              name: 'QA ' + role,
-              email: role + '@example.test',
-              password: 'qa-only-strong-password',
-              role,
-            })
-          ).status,
-          201,
-        );
+      assert.equal(
+        (
+          await request('/users', 'POST', {
+            name: 'QA Cashier',
+            email: 'cashier@example.test',
+            password: 'qa-only-strong-password',
+            role: 'cashier',
+          })
+        ).status,
+        201,
+      );
+      assert.equal(
+        (
+          await request('/users', 'POST', {
+            name: 'QA Viewer',
+            email: 'viewer@example.test',
+            password: 'qa-only-strong-password',
+            role: 'viewer',
+          })
+        ).status,
+        400,
+      );
       const cashier = await request('/auth/login', 'POST', {
         email: 'cashier@example.test',
         password: 'qa-only-strong-password',
@@ -93,6 +103,13 @@ test(
         403,
       );
       assert.equal((await request('/users', 'GET', undefined, cashierToken)).status, 403);
+      assert.equal((await request('/records', 'GET', undefined, cashierToken)).status, 403);
+      assert.equal((await request('/dashboard', 'GET', undefined, cashierToken)).status, 403);
+      assert.equal((await request('/auth/password', 'POST', {}, cashierToken)).status, 403);
+      const cashierSettings = await request('/settings', 'GET', undefined, cashierToken);
+      assert.equal(cashierSettings.status, 200);
+      assert.equal('affidavitTemplate' in cashierSettings.body, false);
+      assert.equal((await request('/audit', 'GET', undefined, cashierToken)).status, 200);
       const image = await sharp({
           create: { width: 20, height: 20, channels: 3, background: '#332211' },
         })
@@ -114,6 +131,7 @@ test(
         weight: { mode: 'traditional', tola: 1, masha: 6, ratti: 0, grams: 0 },
         ratePaisa: 26000000,
         items: ['Ring'],
+        carat: 22,
         customer: {
           name: 'Test Seller',
           cnic: '0000000000099',
@@ -177,6 +195,34 @@ test(
       const id = created[0].body._id,
         read = await request('/records/' + id);
       assert.equal(read.body.media[0].sha256, file.sha256);
+      assert.equal(read.body.carat, 22);
+      const cashierEntry = {
+        ...entry,
+        weight: { mode: 'grams', tola: 0, masha: 0, ratti: 0, grams: 11.664 },
+        items: ['Chain'],
+        carat: 21,
+        customer: { name: 'Cashier Seller', cnic: '', phone: '' },
+        signatureId: null,
+        thumbId: null,
+        thumbSource: null,
+        idempotencyKey: randomUUID(),
+      };
+      const cashierCreated = await request('/records', 'POST', cashierEntry, cashierToken);
+      assert.equal(cashierCreated.status, 201, JSON.stringify(cashierCreated.body));
+      assert.equal(cashierCreated.body.carat, 21);
+      assert.equal(
+        (await request('/records/' + cashierCreated.body._id, 'GET', undefined, cashierToken))
+          .status,
+        200,
+      );
+      assert.equal((await request('/records/' + id, 'GET', undefined, cashierToken)).status, 404);
+      assert.equal((await request('/records?q=11.664g')).body.items.length, 1);
+      const cashierActivity = await request('/audit', 'GET', undefined, cashierToken);
+      assert.ok(
+        cashierActivity.body.items.every(
+          (a) => String(a.actorId) === cashierCreated.body.createdBy,
+        ),
+      );
       const original = await fetch(base + '/media/' + file.id, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -186,16 +232,6 @@ test(
       assert.equal((await request('/records?q=0302')).body.items.length, 1);
       assert.equal((await request('/records?q=030239&field=phone')).body.items.length, 1);
       assert.equal((await request('/records?q%5B%24ne%5D=x')).status, 400);
-      const viewer = await request('/auth/login', 'POST', {
-        email: 'viewer@example.test',
-        password: 'qa-only-strong-password',
-      });
-      assert.equal(
-        (
-          await request('/records', 'POST', entry, viewer.body.token)
-        ).status,
-        403,
-      );
       assert.equal(
         (
           await request('/records/' + id + '/void', 'POST', {
@@ -204,7 +240,7 @@ test(
         ).status,
         200,
       );
-      assert.equal((await request('/dashboard')).body.stats.count, 0);
+      assert.equal((await request('/dashboard')).body.stats.count, 1);
       assert.equal((await request('/records/' + id)).body.voided, true);
       assert.ok(await Audit.exists({ action: 'record.voided' }));
 
@@ -238,7 +274,7 @@ test(
       assert.equal(retained.deleteReason, 'Duplicate purchase entered in error');
       assert.ok(retained.deletedAt);
       assert.equal((await request('/records?q=0300')).body.items.length, 0);
-      assert.equal((await request('/dashboard')).body.stats.count, 0);
+      assert.equal((await request('/dashboard')).body.stats.count, 1);
       assert.equal((await request('/records/' + deleteId)).status, 404);
       assert.ok(
         await Audit.exists({
@@ -269,7 +305,7 @@ test(
       const pending = await Purchase.findOne({ idempotencyKey: recoveryEntry.idempotencyKey });
       assert.equal(pending.state, 'pending');
       assert.equal((await request('/records/' + pending._id)).status, 404);
-      assert.equal((await request('/dashboard')).body.stats.count, 0);
+      assert.equal((await request('/dashboard')).body.stats.count, 1);
       const resumed = await request('/records', 'POST', recoveryEntry);
       assert.equal(resumed.status, 200);
       assert.equal(resumed.body._id, String(pending._id));
@@ -290,7 +326,7 @@ test(
       });
       assert.equal(reused.status, 400);
       assert.equal(reused.body.resetSubmission, true);
-      assert.equal((await request('/dashboard')).body.stats.count, 1);
+      assert.equal((await request('/dashboard')).body.stats.count, 2);
       assert.equal(
         (
           await request('/records/' + pending._id + '/void', 'POST', {
@@ -316,7 +352,7 @@ test(
           await request(
             '/users/' + owner._id,
             'PATCH',
-            { role: 'viewer', active: false },
+            { role: 'cashier', active: false },
             secondaryToken,
           )
         ).status,
@@ -324,7 +360,7 @@ test(
       );
       const cashierUser = await User.findOne({ email: 'cashier@example.test' });
       assert.equal(
-        (await request('/users/' + cashierUser._id, 'PATCH', { role: 'viewer', active: false }))
+        (await request('/users/' + cashierUser._id, 'PATCH', { role: 'cashier', active: false }))
           .status,
         200,
       );

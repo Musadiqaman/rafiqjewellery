@@ -7,7 +7,7 @@ const user = new Schema(
     name: String,
     email: { type: String, unique: true, required: true },
     passwordHash: { type: String, select: false, required: true },
-    role: { type: String, enum: ['admin', 'manager', 'cashier', 'viewer'], required: true },
+    role: { type: String, enum: ['admin', 'cashier'], required: true },
     active: { type: Boolean, default: true },
     initialAdminKey: { type: String, unique: true, sparse: true },
     isPrimaryAdmin: { type: Boolean, default: false },

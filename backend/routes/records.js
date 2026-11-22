@@ -25,10 +25,10 @@ records.post(
   upload.single('file'),
   postMedia,
 );
-records.get('/media/:id', allow('read'), getMediaId);
+records.get('/media/:id', allow('receipt'), getMediaId);
 records.get('/records', allow('read'), getRecords);
 records.get('/records/export.csv', allow('export'), getRecordsExportCsv);
-records.get('/records/:id', allow('read'), getRecordsId);
+records.get('/records/:id', allow('receipt'), getRecordsId);
 records.post('/records', allow('create'), rateLimit('record-create', 60, 60000), postRecords);
 records.post('/records/:id/void', allow('void'), postRecordsIdVoid);
 records.post('/records/:id/delete', allow('delete'), postRecordsIdDelete);

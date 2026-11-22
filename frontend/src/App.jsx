@@ -35,7 +35,10 @@ export default function App() {
       return;
     }
     api('/auth/me')
-      .then((d) => setUser(d.user))
+      .then((d) => {
+        setUser(d.user);
+        setPage(d.user.role === 'cashier' ? 'entry' : 'home');
+      })
       .catch(() => {
         clearAccessToken();
         setUser(null);
@@ -67,10 +70,12 @@ export default function App() {
   };
   const login = (u) => {
     setUser(u);
+    setPage(u.role === 'cashier' ? 'entry' : 'home');
     setReauth(false);
     client.invalidateQueries();
   };
-  const go = (p) => {
+  const go = (requestedPage) => {
+    const p = requestedPage === 'home' && !can(user.role, 'read') ? 'entry' : requestedPage;
     if (page === 'entry' && p !== 'entry' && entryDirty) {
       setLeaveConfirm({ type: 'page', page: p });
       return;
@@ -124,7 +129,7 @@ export default function App() {
     <>
       <div className="workspace">
         <header className="topbar">
-          <button className="brand" onClick={() => go('home')}>
+          <button className="brand" onClick={() => go(can(user.role, 'read') ? 'home' : 'entry')}>
             <span className="brand-icon brand-monogram" aria-label="Rafiq Jewellery">
               RJ
             </span>
@@ -143,7 +148,7 @@ export default function App() {
           </div>
         </header>
         <main className={'main ' + (page === 'entry' ? 'entry-main' : '')}>
-          {page === 'home' && <Dashboard user={user} onOpen={openRecord} />}
+          {page === 'home' && can(user.role, 'read') && <Dashboard user={user} onOpen={openRecord} />}
           {can(user.role, 'create') && (
             <div hidden={page !== 'entry'}>
               <NewEntry
@@ -163,19 +168,22 @@ export default function App() {
               initialReceipt={record.receipt}
               receiptSize={shop.receiptSize}
               deleteAllowed={can(user.role, 'delete')}
-              onBack={() => go('home')}
+              receiptOnly={user.role === 'cashier'}
+              onBack={() => go(can(user.role, 'read') ? 'home' : 'entry')}
             />
           )}
         </main>
         <nav className="bottom-nav" aria-label="Main navigation">
           <div className="nav-inner">
-            <button
-              className={page === 'home' || page === 'record' ? 'active' : ''}
-              onClick={() => go('home')}
-            >
-              <Home size={21} />
-              <span>Home</span>
-            </button>
+            {can(user.role, 'read') && (
+              <button
+                className={page === 'home' || page === 'record' ? 'active' : ''}
+                onClick={() => go('home')}
+              >
+                <Home size={21} />
+                <span>Home</span>
+              </button>
+            )}
             {can(user.role, 'create') && (
               <button
                 className={'new-nav ' + (page === 'entry' ? 'active' : '')}

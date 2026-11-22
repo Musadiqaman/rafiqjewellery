@@ -4,6 +4,34 @@ import { Types } from 'mongoose';
 import { listSchema, normalizeName, escapeRegex } from '../validators/domain.js';
 import { env } from '../config/env.js';
 import { hash, equal, HttpError } from '../middlewares/security.js';
+function weightSearchConditions(value, allowBareInteger = false) {
+  const trimmed = String(value || '').trim(),
+    tokenPattern = /(\d+(?:\.\d+)?)\s*(g|grams?|tolas?)\b/gi,
+    matches = [...trimmed.matchAll(tokenPattern)];
+
+  if (matches.length) {
+    const remainder = trimmed
+      .replace(tokenPattern, '')
+      .replace(/[\s/·|,;:+()[\]{}-]/g, '');
+    if (remainder) return null;
+    return matches.map((match) => {
+      const value = Number(match[1]),
+        precision = (match[1].split('.')[1] || '').length,
+        tolerance = 0.5 * 10 ** -precision,
+        field = /^tolas?$/i.test(match[2]) ? 'tola' : 'grams';
+      return { [field]: { $gte: Math.max(0, value - tolerance), $lt: value + tolerance } };
+    });
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(trimmed) && (allowBareInteger || trimmed.includes('.'))) {
+    const value = Number(trimmed),
+      precision = (trimmed.split('.')[1] || '').length,
+      tolerance = 0.5 * 10 ** -precision;
+    return [{ grams: { $gte: Math.max(0, value - tolerance), $lt: value + tolerance } }];
+  }
+  return null;
+}
+
 function phoneSearchConditions(digits) {
   const variants = new Set([digits]);
   if (digits.startsWith('03')) {
@@ -37,16 +65,27 @@ export function buildQuery(raw) {
     const digits = input.q.replace(/\D/g, ''),
       numericSearch = /^[\d\s+().-]+$/.test(input.q) && digits.length >= 2,
       looksLikePhone = /^(0?3|92|0092)/.test(digits),
+      trimmed = input.q.trim(),
+      weightConditions = weightSearchConditions(trimmed, input.field === 'weight'),
       field =
         input.field === 'all'
-          ? numericSearch
-            ? looksLikePhone
-              ? 'phoneOrCnic'
-              : 'cnic'
-            : /^RJ-/i.test(input.q)
-              ? 'reference'
-              : 'name'
+          ? weightConditions
+            ? 'weight'
+            : numericSearch
+              ? looksLikePhone
+                ? 'phoneOrCnic'
+                : 'cnic'
+              : /^RJ-/i.test(input.q)
+                ? 'reference'
+                : 'name'
           : input.field;
+
+    if (field === 'weight') {
+      const conditions = weightConditions || weightSearchConditions(trimmed, true);
+      if (!conditions)
+        throw new HttpError(400, 'Enter a weight in grams or tola, e.g. 11.664g or 1 tola');
+      clauses.push(conditions.length === 1 ? conditions[0] : { $or: conditions });
+    }
 
     if (field === 'cnic') {
       if (!/^\d{2,13}$/.test(digits))

@@ -102,6 +102,12 @@ test('minimum purchase payload needs a valid gold quantity and system rate only'
   assert.equal(parsed.data.signatureId, null);
   assert.equal(parsed.data.thumbId, null);
 });
+test('carat is optional but constrained to a valid 1K to 24K value', () => {
+  assert.equal(entrySchema.parse(fixture()).carat, null);
+  assert.ok(entrySchema.safeParse({ ...fixture(), carat: 22 }).success);
+  assert.equal(entrySchema.safeParse({ ...fixture(), carat: 25 }).success, false);
+  assert.equal(entrySchema.safeParse({ ...fixture(), carat: '22' }).success, false);
+});
 test('removed fields and client-controlled timestamps/totals are rejected', () => {
   for (const field of [
     'purchasedAt',
@@ -137,13 +143,18 @@ test('HTML, invalid phone and excess photos are rejected', () => {
   ])
     assert.equal(entrySchema.safeParse({ ...fixture(), ...patch }).success, false);
 });
-test('permissions protect manager, cashier and viewer boundaries', () => {
+test('only admin and cashier permissions are active', () => {
   assert.equal(can('viewer', 'create'), false);
+  assert.equal(can('manager', 'void'), false);
+  assert.equal(can('cashier', 'read'), false);
+  assert.equal(can('cashier', 'create'), true);
+  assert.equal(can('cashier', 'receipt'), true);
+  assert.equal(can('cashier', 'activity'), true);
   assert.equal(can('cashier', 'export'), false);
   assert.equal(can('cashier', 'rate'), false);
-  assert.equal(can('manager', 'users'), false);
-  assert.equal(can('manager', 'void'), true);
+  assert.equal(can('cashier', 'password'), false);
   assert.equal(can('admin', 'settings'), true);
+  assert.equal(can('admin', 'password'), true);
 });
 test('name prefixes include full name and surname', () => {
   assert.equal(normalizeName('  AHMED  Raza '), 'ahmed raza');

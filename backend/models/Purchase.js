@@ -28,6 +28,7 @@ const purchase = new Schema(
     grossPaisa: Number,
     totalPaisa: Number,
     items: [String],
+    carat: Number,
     photoIds: [ObjectId],
     signatureId: ObjectId,
     thumbId: ObjectId,

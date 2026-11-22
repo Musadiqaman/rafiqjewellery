@@ -19,4 +19,4 @@ settings.patch('/settings/rate', allow('rate'), patchSettingsRate);
 settings.get('/users', allow('users'), getUsers);
 settings.post('/users', allow('users'), postUsers);
 settings.patch('/users/:id', allow('users'), patchUsersId);
-settings.get('/audit', allow('users'), getAudit);
+settings.get('/audit', allow('activity'), getAudit);

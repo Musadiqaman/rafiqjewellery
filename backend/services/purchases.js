@@ -212,7 +212,7 @@ export async function savePurchase(input, req) {
       shop: settings.shopName,
       rate: `Rs ${(d.ratePaisa / 100).toLocaleString('en-PK')}`,
       amount: `Rs ${(sums.totalPaisa / 100).toLocaleString('en-PK')}`,
-    }),
+    }).replace(/\s*\(\s*[\d.]+\s+tola\s*\)/gi, ''),
     shopSnapshot: { name: settings.shopName, address: settings.address, phone: settings.phone },
     createdBy: req.user._id,
     createdByName: req.user.name,

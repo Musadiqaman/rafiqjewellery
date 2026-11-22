@@ -8,10 +8,12 @@ const fields = (r) => [
   ['Seller', r.customer.name || '-'],
   ...(r.customer.cnic ? [['CNIC', formatCnic(r.customer.cnic)]] : []),
   ...(r.customer.phone ? [['Phone', r.customer.phone]] : []),
-  ['Items', r.items?.length ? r.items.join(', ') : '—'],
-  ['Weight', `${r.grams.toFixed(3)} g / ${r.tola.toFixed(4)} tola`],
+  ['Item', r.items?.length ? r.items.join(', ') : '—'],
+  ['Carat', r.carat ? `${r.carat}K` : '—'],
+  ['Weight', `${Number(r.grams || 0).toFixed(3)} g`],
   ['Rate / tola', money(r.ratePaisa, 2)],
 ];
+const affidavitText = (value = '') => String(value).replace(/\s*\(\s*[\d.]+\s+tola\s*\)/gi, '');
 const evidence = (r) => [
   ...(r.photoIds || []).map((id, i) => ({ id, label: 'Photo ' + (i + 1) })),
   ...(r.signatureId ? [{ id: r.signatureId, label: 'Signature' }] : []),
@@ -84,24 +86,28 @@ function Receipt({ r, size }) {
         <span>Total paid</span>
         <strong>{money(r.totalPaisa, 2)}</strong>
       </div>
-      <h3>Seller affidavit</h3>
-      <p className="receipt-declaration">{r.declarationText}</p>
-      <div className="receipt-evidence">
-        {evidence(r)
-          .filter((p) => p.id === r.signatureId || p.id === r.thumbId)
-          .map((p) => (
-            <div key={p.id}>
-              <AuthImage id={p.id} alt={p.label} />
-              <span>{p.label}</span>
-            </div>
-          ))}
-      </div>
+      {size === 'a4' && (
+        <>
+          <h3>Seller affidavit</h3>
+          <p className="receipt-declaration">{affidavitText(r.declarationText)}</p>
+          <div className="receipt-evidence">
+            {evidence(r)
+              .filter((p) => p.id === r.signatureId || p.id === r.thumbId)
+              .map((p) => (
+                <div key={p.id}>
+                  <AuthImage id={p.id} alt={p.label} />
+                  <span>{p.label}</span>
+                </div>
+              ))}
+          </div>
+          <footer>Recorded by {r.createdByName}</footer>
+        </>
+      )}
       {r.voided && <p>Void reason: {r.voidReason}</p>}
-      <footer>Recorded by {r.createdByName}</footer>
     </article>
   );
 }
-async function receiptImage(r) {
+async function receiptImage(r, size = 'a4') {
   await document.fonts.ready;
   const measure = document.createElement('canvas').getContext('2d');
   measure.font = '400 20px Inter';
@@ -128,13 +134,15 @@ async function receiptImage(r) {
   wrap('');
   for (const [k, v] of fields(r)) wrap(k + ': ' + v);
   wrap('Total paid: ' + money(r.totalPaisa, 2), true);
-  wrap('');
-  wrap('Seller affidavit', true);
-  wrap(r.declarationText || '');
   const images = [];
   const objectUrls = [];
   try {
-    for (const p of evidence(r).filter((x) => x.id === r.signatureId || x.id === r.thumbId)) {
+    if (size === 'a4') {
+      wrap('');
+      wrap('Seller affidavit', true);
+      wrap(affidavitText(r.declarationText));
+    }
+    for (const p of (size === 'a4' ? evidence(r) : []).filter((x) => x.id === r.signatureId || x.id === r.thumbId)) {
       const objectUrl = URL.createObjectURL(await apiBlob(mediaUrl(p.id)));
       objectUrls.push(objectUrl);
       const img = new window.Image();
@@ -143,7 +151,7 @@ async function receiptImage(r) {
       images.push({ img, label: p.label });
     }
     if (r.voided) wrap('VOIDED: ' + r.voidReason, true);
-    wrap('Recorded by ' + r.createdByName);
+    if (size === 'a4') wrap('Recorded by ' + r.createdByName);
     const canvas = document.createElement('canvas');
     canvas.width = 1100;
     canvas.height = 160 + lines.length * 32 + images.length * 220;
@@ -180,6 +188,7 @@ export function RecordView({
   deleteAllowed,
   initialReceipt = false,
   receiptSize = 'a4',
+  receiptOnly = false,
 }) {
   const client = useQueryClient(),
     q = useQuery({ queryKey: ['record', id], queryFn: () => api('/records/' + id) }),
@@ -229,7 +238,7 @@ export function RecordView({
     <>
       <div className="page-heading">
         <div className="button-row">
-          <button className="icon-btn" aria-label="Back to dashboard" onClick={onBack}>
+          <button className="icon-btn" aria-label={receiptOnly ? "Back to new entry" : "Back to dashboard"} onClick={onBack}>
             <ArrowLeft size={21} />
           </button>
           <h1>{r.reference}</h1>
@@ -239,55 +248,61 @@ export function RecordView({
           Receipt
         </button>
       </div>
-      <div className="record-layout">
-        <section className="card detail-card">
-          <div className="section-heading">
-            <h2>Purchase details</h2>
-            <Status r={r} />
-          </div>
-          <dl className="detail-list">
-            {[
-              ['Date', dateLabel(r.purchasedAt, true)],
-              ...fields(r),
-              ['Recorded by', r.createdByName],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt>{k}</dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="detail-total">
-            <span>Total paid</span>
-            <strong>{money(r.totalPaisa, 2)}</strong>
-          </div>
-          {r.voided && <Notice>Voided: {r.voidReason}</Notice>}
-          {deleteAllowed && (
-            <button className="text-btn danger-text" onClick={() => setDeleteOpen(true)}>
-              <Trash2 size={15} />
-              Delete purchase
-            </button>
-          )}
-        </section>
-        <section className="card detail-card">
-          <h2>Photos & signature</h2>
-          {evidence(r).length ? (
-            <div className="evidence-gallery">
-              {evidence(r).map((p) => (
-                <button key={p.id} onClick={() => setImage(p)}>
-                  <AuthImage id={p.id} alt={p.label} />
-                  <span>
-                    {p.label}
-                    <ExternalLink size={13} />
-                  </span>
-                </button>
-              ))}
+      {!receiptOnly ? (
+        <div className="record-layout">
+          <section className="card detail-card">
+            <div className="section-heading">
+              <h2>Purchase details</h2>
+              <Status r={r} />
             </div>
-          ) : (
-            <p className="muted">No photos, signature or thumb image attached.</p>
-          )}
+            <dl className="detail-list">
+              {[
+                ['Date', dateLabel(r.purchasedAt, true)],
+                ...fields(r),
+                ['Recorded by', r.createdByName],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="detail-total">
+              <span>Total paid</span>
+              <strong>{money(r.totalPaisa, 2)}</strong>
+            </div>
+            {r.voided && <Notice>Voided: {r.voidReason}</Notice>}
+            {deleteAllowed && (
+              <button className="text-btn danger-text" onClick={() => setDeleteOpen(true)}>
+                <Trash2 size={15} />
+                Delete purchase
+              </button>
+            )}
+          </section>
+          <section className="card detail-card">
+            <h2>Photos & signature</h2>
+            {evidence(r).length ? (
+              <div className="evidence-gallery">
+                {evidence(r).map((p) => (
+                  <button key={p.id} onClick={() => setImage(p)}>
+                    <AuthImage id={p.id} alt={p.label} />
+                    <span>
+                      {p.label}
+                      <ExternalLink size={13} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">No photos, signature or thumb image attached.</p>
+            )}
+          </section>
+        </div>
+      ) : (
+        <section className="card detail-card cashier-receipt-note">
+          <p className="muted">Receipt is ready. Print it or download a copy before starting the next entry.</p>
         </section>
-      </div>
+      )}
       {receipt && (
         <Modal title="Purchase receipt" wide onClose={() => setReceipt(false)}>
           <div className="receipt-toolbar">
@@ -308,7 +323,7 @@ export function RecordView({
                 setBusy(true);
                 setError('');
                 try {
-                  await receiptImage(r);
+                  await receiptImage(r, size);
                 } catch {
                   setError('Image export failed. Please retry.');
                 } finally {

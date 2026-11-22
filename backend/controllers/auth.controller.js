@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { User, Challenge } from '../models/index.js';
 import { env, CHALLENGE_COOKIE, cookieOptions } from '../config/env.js';
 import { HttpError, createAccessTokenResponse, equal, hash, audit } from '../middlewares/security.js';
-import { setupSchema, loginSchema, passwordSchema } from '../validators/domain.js';
+import { setupSchema, loginSchema, passwordSchema, roles } from '../validators/domain.js';
 
 let webAuthnPromise;
 const loadWebAuthn = () => {
@@ -37,6 +37,8 @@ export const postLogin = async (req, res) => {
   const comparisonHash = u?.passwordHash || (await getDummyHash());
   const valid = await bcrypt.compare(d.password, comparisonHash);
   if (!u || !valid || !u.active) throw new HttpError(401, 'Email or password is incorrect');
+  if (!roles.includes(u.role))
+    throw new HttpError(403, 'This account role is no longer available. Ask an administrator to assign Admin or Cashier access.');
   req.user = u;
   await audit(req, 'session.login');
   res.json(createAccessTokenResponse(u));
@@ -160,6 +162,8 @@ export const postPasskeysLoginVerify = async (req, res) => {
   const u = await User.findOne({ 'passkeys.id': id, active: true }),
     p = u?.passkeys.find((x) => x.id === id);
   if (!u || !p) throw new HttpError(401, 'Passkey not recognized');
+  if (!roles.includes(u.role))
+    throw new HttpError(403, 'This account role is no longer available. Ask an administrator to assign Admin or Cashier access.');
   const { verifyAuthenticationResponse } = await loadWebAuthn();
   const v = await verifyAuthenticationResponse({
     response: req.body,

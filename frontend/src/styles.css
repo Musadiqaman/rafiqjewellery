@@ -3580,3 +3580,51 @@ select option:disabled {
     width: 100%;
   }
 }
+
+
+/* Per-card privacy controls and three-field purchase header */
+.stat-visibility {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 29px;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: 1px solid #e5d6b8;
+  border-radius: 7px;
+  background: #fffdf8;
+  color: #80590f;
+  cursor: pointer;
+}
+.stat-visibility:hover {
+  border-color: #c49a3a;
+  background: #fbf3e3;
+}
+.stat-visibility:focus-visible {
+  outline: 2px solid #c49a3a;
+  outline-offset: 2px;
+}
+.stat-dark .stat-visibility {
+  border-color: #73551f;
+  background: #3b2c16;
+  color: #f0cf79;
+}
+.stat-dark .stat-visibility:hover {
+  background: #4a371b;
+}
+.entry-top-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 760px;
+}
+@media (max-width: 800px) {
+  .entry-top-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: none;
+  }
+}
+@media (max-width: 520px) {
+  .entry-top-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -32,7 +32,7 @@ Vercel and Oracle configurations are included, but have not been deployed to the
 4. Save another record using grams. Check Today / All dates / Custom filters, totals, CSV and infinite pagination. Void a record; confirm the record is retained and active totals exclude it.
 5. Retry the same submission after an interrupted connection. Confirm only one bill exists. Run repair and confirm pending writes/audit projections are completed or safely marked failed, without showing incomplete bills in totals.
 6. Edit the affidavit and confirm old receipts retain their original wording. Verify A4 / 80 mm / 58 mm printing and PNG output with long text and evidence images.
-7. Confirm cashier/viewer restrictions, invalidation of changed users' access tokens, passkey enrollment/login, physical scanner bridge if installed, camera permissions and image quality.
+7. Confirm Admin/Cashier restrictions, cashier-owned receipts and activity only, blocked password/passkey changes for cashiers, invalidation of changed users' access tokens, admin passkey enrollment/login, physical scanner bridge if installed, camera permissions and image quality.
 8. Check iPhone Safari and Android installation over HTTPS. Short viewports and onscreen keyboards may require natural scrolling to keep controls accessible.
 
 The application does not claim identity verification from a camera photo, fabricate fingerprint images or successful saves, or store purchases in localStorage/sample arrays.

@@ -154,7 +154,7 @@ test('primary administrator cannot be disabled or demoted on standalone MongoDB'
       {
         params: { id: 'a'.repeat(24) },
         user: { _id: 'b'.repeat(24) },
-        body: { role: 'viewer', active: false },
+        body: { role: 'cashier', active: false },
       },
       {},
     ),

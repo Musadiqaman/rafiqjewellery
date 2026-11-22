@@ -30,10 +30,14 @@ export const getMediaId = async (req, res) => {
   if (!Types.ObjectId.isValid(String(req.params.id))) throw new HttpError(404, 'Image not found');
   const m = await Media.findById(req.params.id);
   if (!m) throw new HttpError(404, 'Image not found');
-  if (
-    String(m.createdBy) !== String(req.user._id) &&
-    !(m.recordId && (await Purchase.exists({ _id: m.recordId, ...visiblePurchase })))
-  )
+  const ownedRecord =
+    m.recordId &&
+    (await Purchase.exists({
+      _id: m.recordId,
+      ...visiblePurchase,
+      ...(req.user.role === 'cashier' ? { createdBy: req.user._id } : {}),
+    }));
+  if (String(m.createdBy) !== String(req.user._id) && !ownedRecord)
     throw new HttpError(404, 'Image not found');
   res
     .type(m.mime)
@@ -46,7 +50,7 @@ export const getRecords = async (req, res) => {
   const q = buildQuery(req.query),
     rows = await Purchase.find(q.filter)
       .select(
-        'reference purchasedAt customer.name customer.cnic items grams tola totalPaisa evidenceStatus voided createdByName',
+        'reference purchasedAt customer.name customer.cnic items carat grams tola totalPaisa evidenceStatus voided createdByName',
       )
       .sort({ purchasedAt: -1, _id: -1 })
       .limit(q.input.limit + 1)
@@ -65,7 +69,7 @@ export const getRecordsExportCsv = async (req, res) => {
   res.type('text/csv').set('Content-Disposition', 'attachment; filename="gold-purchases.csv"');
   res.write(
     '\uFEFF' +
-      ['Reference', 'Date', 'Customer', 'CNIC', 'Phone', 'Items', 'Grams', 'Amount PKR', 'Status']
+      ['Reference', 'Date', 'Customer', 'CNIC', 'Phone', 'Items', 'Carat', 'Grams', 'Amount PKR', 'Status']
         .map(csvCell)
         .join(',') +
       '\r\n',
@@ -85,6 +89,7 @@ export const getRecordsExportCsv = async (req, res) => {
           r.customer?.cnic,
           r.customer?.phone,
           r.items.join(', '),
+          r.carat ? `${r.carat}K` : '',
           r.grams,
           (r.totalPaisa || 0) / 100,
           r.voided ? 'void' : r.evidenceStatus,
@@ -110,7 +115,11 @@ export const getRecordsExportCsv = async (req, res) => {
 
 export const getRecordsId = async (req, res) => {
   if (!Types.ObjectId.isValid(String(req.params.id))) throw new HttpError(404, 'Record not found');
-  const r = await Purchase.findOne({ _id: req.params.id, ...visiblePurchase }).lean();
+  const r = await Purchase.findOne({
+    _id: req.params.id,
+    ...visiblePurchase,
+    ...(req.user.role === 'cashier' ? { createdBy: req.user._id } : {}),
+  }).lean();
   if (!r) throw new HttpError(404, 'Record not found');
   await audit(req, 'record.view', r.reference, r._id);
   res.json({
@@ -159,7 +168,7 @@ export const getDashboard = async (req, res) => {
     ]).option({ maxTimeMS: 5000 }),
     Purchase.find(q.filter)
       .select(
-        'reference purchasedAt customer.name customer.cnic items grams tola totalPaisa evidenceStatus voided createdByName',
+        'reference purchasedAt customer.name customer.cnic items carat grams tola totalPaisa evidenceStatus voided createdByName',
       )
       .sort({ purchasedAt: -1, _id: -1 })
       .limit(q.input.limit + 1)

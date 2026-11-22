@@ -1,11 +1,9 @@
 import { z } from 'zod';
 export const GRAMS_PER_TOLA = 11.664;
-export const roles = ['admin', 'manager', 'cashier', 'viewer'];
+export const roles = ['admin', 'cashier'];
 export const permissions = {
-  admin: ['read', 'create', 'export', 'rate', 'void', 'delete', 'settings', 'users'],
-  manager: ['read', 'create', 'export', 'rate', 'void', 'delete'],
-  cashier: ['read', 'create'],
-  viewer: ['read'],
+  admin: ['read', 'create', 'export', 'rate', 'void', 'delete', 'settings', 'users', 'activity', 'receipt', 'password'],
+  cashier: ['create', 'activity', 'receipt'],
 };
 export const can = (role, permission) => permissions[role]?.includes(permission) || false;
 export const normalizeName = (s) => s.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -85,6 +83,7 @@ export const entrySchema = z
     weight: weightSchema,
     ratePaisa: z.number().int().min(100).max(1000000000),
     items: z.array(plain(60).min(1)).max(12).default([]),
+    carat: z.number().min(1).max(24).nullable().default(null),
     customer: z
       .object({
         name: plain(100).default(''),
@@ -125,7 +124,7 @@ export const setupSchema = loginSchema.extend({
   setupKey: z.string().min(16).max(200),
 });
 export const userSchema = loginSchema.extend({ name: plain(100).min(2), role: z.enum(roles) });
-export const DEFAULT_AFFIDAVIT = `I, {{name}}, holder of CNIC No. {{cnic}}, declare that I am the lawful owner of the gold / ornaments weighing {{weight}} ({{tola}} tola), sold to {{shop}} on {{date}} at {{rate}} per tola for {{amount}}.\n\nThe gold is my own property, acquired lawfully and free from theft, dispute, lien or other encumbrance. I have sold it of my own free will.\n\nIf any claim is made regarding this gold, I shall be responsible for it and for the resulting losses and legal consequences. The information given by me is true to the best of my knowledge.`;
+export const DEFAULT_AFFIDAVIT = `I, {{name}}, holder of CNIC No. {{cnic}}, declare that I am the lawful owner of the gold / ornaments weighing {{weight}}, sold to {{shop}} on {{date}} at {{rate}} per tola for {{amount}}.\n\nThe gold is my own property, acquired lawfully and free from theft, dispute, lien or other encumbrance. I have sold it of my own free will.\n\nIf any claim is made regarding this gold, I shall be responsible for it and for the resulting losses and legal consequences. The information given by me is true to the best of my knowledge.`;
 export const AFFIDAVIT_FIELDS = [
   'name',
   'cnic',
@@ -167,7 +166,7 @@ export const renderAffidavit = (template, values) =>
 export const listSchema = z
   .object({
     q: z.string().trim().max(100).default(''),
-    field: z.enum(['all', 'name', 'cnic', 'phone', 'reference']).default('all'),
+    field: z.enum(['all', 'name', 'cnic', 'phone', 'reference', 'weight']).default('all'),
     from: z.iso.date().optional(),
     to: z.iso.date().optional(),
     status: z.enum(['all', 'active', 'void']).default('all'),

@@ -1,12 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Search, Download, ArrowUpRight, ReceiptText, Scale } from 'lucide-react';
+import { Search, Download, Eye, EyeOff } from 'lucide-react';
 import { can, formatCnic, GRAMS_PER_TOLA } from '../../lib/domain.js';
 import { api, apiBlob, money, dateLabel, dateKey, download, REVIEW_ONLY } from '../../lib/api';
 import { Empty, Notice, Spinner, Modal, Field, DatePicker } from '../../components/ui';
+
+const STATS_VISIBILITY_KEY = 'rafiq-jewellery-stats-visibility';
+const DEFAULT_STATS_VISIBILITY = { totalPaid: false, goldPurchased: false, purchases: false };
+function readStatsVisibility() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(STATS_VISIBILITY_KEY) || 'null');
+    return {
+      totalPaid: saved?.totalPaid === true,
+      goldPurchased: saved?.goldPurchased === true,
+      purchases: saved?.purchases === true,
+    };
+  } catch {
+    return { ...DEFAULT_STATS_VISIBILITY };
+  }
+}
+
 export function Dashboard({ user, onOpen }) {
-  const [period, setPeriod] = useState('today'),
+  const [visibleStats, setVisibleStats] = useState(readStatsVisibility),
+    [period, setPeriod] = useState('today'),
     [from, setFrom] = useState(dateKey()),
     [to, setTo] = useState(dateKey()),
     [search, setSearch] = useState(''),
@@ -18,6 +35,15 @@ export function Dashboard({ user, onOpen }) {
     [exportError, setExportError] = useState(''),
     parent = useRef(null),
     sentinel = useRef(null);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STATS_VISIBILITY_KEY, JSON.stringify(visibleStats));
+    } catch {
+      // Keep the dashboard usable if browser storage is unavailable.
+    }
+  }, [visibleStats]);
+  const toggleStat = (key) =>
+    setVisibleStats((current) => ({ ...current, [key]: !current[key] }));
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search), 250);
     return () => clearTimeout(timer);
@@ -97,7 +123,7 @@ export function Dashboard({ user, onOpen }) {
           <Search size={17} />
           <input
             aria-label="Search purchases"
-            placeholder="Search name, CNIC, phone or receipt"
+            placeholder="Search name, CNIC, phone, receipt or weight (e.g. 11.664g or 1 tola)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -109,38 +135,78 @@ export function Dashboard({ user, onOpen }) {
         </div>
       </div>
       {!valid && <Notice error>Select a valid date range.</Notice>}
-      <section className="stats-grid">
+      <section className="stats-grid" aria-label="Purchase statistics">
         <div className="stat stat-dark">
-          <div>
+          <div className="stat-heading">
             <span>Total paid</span>
-            <ArrowUpRight size={19} />
+            <button
+              type="button"
+              className="stat-visibility"
+              aria-label={visibleStats.totalPaid ? 'Hide total paid' : 'Show total paid'}
+              aria-pressed={visibleStats.totalPaid}
+              title={visibleStats.totalPaid ? 'Hide total paid' : 'Show total paid'}
+              onClick={() => toggleStat('totalPaid')}
+            >
+              {visibleStats.totalPaid ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
-          <strong>{d ? money(d.amount) : '—'}</strong>
+          <strong>{visibleStats.totalPaid ? (d ? money(d.amount) : '—') : '••••••'}</strong>
           <small>
-            {period === 'today'
-              ? "Today's purchases"
-              : period === 'all'
-                ? 'All dates'
-                : 'Selected dates'}
+            {visibleStats.totalPaid
+              ? period === 'today'
+                ? "Today's purchases"
+                : period === 'all'
+                  ? 'All dates'
+                  : 'Selected dates'
+              : 'Hidden'}
           </small>
         </div>
         <div className="stat">
-          <div>
+          <div className="stat-heading">
             <span>Gold purchased</span>
-            <Scale size={19} />
+            <button
+              type="button"
+              className="stat-visibility"
+              aria-label={visibleStats.goldPurchased ? 'Hide gold purchased' : 'Show gold purchased'}
+              aria-pressed={visibleStats.goldPurchased}
+              title={visibleStats.goldPurchased ? 'Hide gold purchased' : 'Show gold purchased'}
+              onClick={() => toggleStat('goldPurchased')}
+            >
+              {visibleStats.goldPurchased ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
           <strong>
-            {d ? d.grams.toLocaleString('en-PK', { maximumFractionDigits: 3 }) : '—'}
-            <em> g</em>
+            {visibleStats.goldPurchased && d
+              ? d.grams.toLocaleString('en-PK', { maximumFractionDigits: 3 })
+              : visibleStats.goldPurchased
+                ? '—'
+                : '••••'}
+            {visibleStats.goldPurchased && <em> g</em>}
           </strong>
-          <small>{d ? Number(d.tola || 0).toFixed(4) + ' tola' : 'Weight'}</small>
+          <small>
+            {visibleStats.goldPurchased && d
+              ? Number(d.tola || 0).toFixed(4) + ' tola'
+              : visibleStats.goldPurchased
+                ? 'Weight'
+                : 'Hidden'}
+          </small>
         </div>
         <div className="stat">
-          <div>
+          <div className="stat-heading">
             <span>Purchases</span>
-            <ReceiptText size={19} />
+            <button
+              type="button"
+              className="stat-visibility"
+              aria-label={visibleStats.purchases ? 'Hide purchases' : 'Show purchases'}
+              aria-pressed={visibleStats.purchases}
+              title={visibleStats.purchases ? 'Hide purchases' : 'Show purchases'}
+              onClick={() => toggleStat('purchases')}
+            >
+              {visibleStats.purchases ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
-          <strong>{d ? d.count.toLocaleString() : '—'}</strong>
+          <strong>{visibleStats.purchases ? (d ? d.count.toLocaleString() : '—') : '••••'}</strong>
+          <small>{visibleStats.purchases ? 'Total records' : 'Hidden'}</small>
         </div>
       </section>
       <section className="card ledger-card">

@@ -18,9 +18,9 @@ auth.post('/setup', rateLimit('setup', 5, 900000), postSetup);
 auth.post('/login', rateLimit('login', 10, 900000), postLogin);
 auth.get('/me', requireAuth, getMe);
 auth.post('/logout', postLogout);
-auth.post('/password', requireAuth, rateLimit('password', 5, 900000), postPassword);
-auth.post('/passkeys/register/options', requireAuth, postPasskeysRegisterOptions);
-auth.post('/passkeys/register/verify', requireAuth, postPasskeysRegisterVerify);
+auth.post('/password', requireAuth, allow('password'), rateLimit('password', 5, 900000), postPassword);
+auth.post('/passkeys/register/options', requireAuth, allow('password'), postPasskeysRegisterOptions);
+auth.post('/passkeys/register/verify', requireAuth, allow('password'), postPasskeysRegisterVerify);
 auth.post(
   '/passkeys/login/options',
   rateLimit('passkey-options', 20, 900000),

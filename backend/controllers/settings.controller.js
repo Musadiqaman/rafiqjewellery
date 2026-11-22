@@ -13,7 +13,18 @@ export const getSystem = async (_req, res) =>
     storage: 'MongoDB + encrypted GridFS',
   });
 
-export const getSettings = async (_req, res) => res.json(await Settings.findById('shop').lean());
+export const getSettings = async (req, res) => {
+  const settings = await Settings.findById('shop').lean();
+  if (req.user.role === 'cashier' && settings) {
+    return res.json({
+      shopName: settings.shopName,
+      ratePaisa: settings.ratePaisa,
+      receiptSize: settings.receiptSize,
+      scannerUrl: settings.scannerUrl,
+    });
+  }
+  res.json(settings);
+};
 
 export const patchSettings = async (req, res) => {
   const d = settingsSchema.parse(req.body),
@@ -101,7 +112,11 @@ export const getAudit = async (req, res) => {
     })
     .strict()
     .parse(req.query);
-  const rows = await Audit.find(before ? { _id: { $lt: new Types.ObjectId(before) } } : {})
+  const filter = {
+    ...(before ? { _id: { $lt: new Types.ObjectId(before) } } : {}),
+    ...(req.user.role === 'cashier' ? { actorId: req.user._id } : {}),
+  };
+  const rows = await Audit.find(filter)
     .sort({ _id: -1 })
     .limit(51)
     .lean();
